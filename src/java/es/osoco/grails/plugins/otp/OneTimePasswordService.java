@@ -32,8 +32,13 @@
  */
 package es.osoco.grails.plugins.otp;
 
+import groovy.lang.StringWriterIOException;
+import groovy.lang.Writable;
+import java.io.Writer;
+import java.io.IOException;
+import java.io.StringWriter;
+
 import org.apache.commons.codec.binary.Base32;
-import org.codehaus.groovy.runtime.EncodingGroovyMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +62,7 @@ public class OneTimePasswordService {
 
 	public boolean isPasswordValid(String presentedPassword, String secretKey) {
 		byte[] decodedSecretKey = base32.decode(secretKey);
-		String hexDecodedSecretKey = EncodingGroovyMethods.encodeHex(decodedSecretKey).toString();
+		String hexDecodedSecretKey = encodeHex(decodedSecretKey).toString();
 		int currentTimeSteps = stepsForUnixTime(System.currentTimeMillis());
 
 		int validWindowStart = currentTimeSteps - preStepsWindow;
@@ -104,4 +109,45 @@ public class OneTimePasswordService {
 		}
 		return steps;
 	}
+
+	/**
+     * Produces a Writable that writes the hex encoding of the byte[]. Calling
+     * toString() on this Writable returns the hex encoding as a String. The hex
+     * encoding includes two characters for each byte and all letters are lower case.
+     *
+     * @param data byte array to be encoded
+     * @return object which will write the hex encoding of the byte array
+     * @see Integer#toHexString(int)
+     */
+    public static Writable encodeHex(final byte[] data) {
+        return new Writable() {
+            public Writer writeTo(Writer out) throws IOException {
+                for (int i = 0; i < data.length; i++) {
+                    // convert byte into unsigned hex string
+                    String hexString = Integer.toHexString(data[i] & 0xFF);
+
+                    // add leading zero if the length of the string is one
+                    if (hexString.length() < 2) {
+                        out.write("0");
+                    }
+
+                    // write hex string to writer
+                    out.write(hexString);
+                }
+                return out;
+            }
+
+            public String toString() {
+                StringWriter buffer = new StringWriter();
+
+                try {
+                    writeTo(buffer);
+                } catch (IOException e) {
+                    throw new StringWriterIOException(e);
+                }
+
+                return buffer.toString();
+            }
+        };
+    }
 }
